@@ -1,5 +1,7 @@
 """Tiny Telegram Bot API wrapper (no heavy frameworks, ideal for serverless)."""
+import json
 import os
+
 import requests
 
 
@@ -11,7 +13,7 @@ def call(method, **params):
     try:
         r = requests.post(f"{_base()}/{method}", json=params, timeout=20)
         return r.json()
-    except Exception as e:  # network / JSON errors
+    except Exception as e:
         return {"ok": False, "description": str(e)}
 
 
@@ -25,6 +27,15 @@ def send(chat_id, text, markup=None, parse_mode="HTML", **kw):
     return call("sendMessage", **p)
 
 
+def edit(chat_id, message_id, text, markup=None, parse_mode="HTML"):
+    p = {"chat_id": chat_id, "message_id": message_id, "text": text, "disable_web_page_preview": True}
+    if parse_mode:
+        p["parse_mode"] = parse_mode
+    if markup:
+        p["reply_markup"] = markup
+    return call("editMessageText", **p)
+
+
 def send_photo(chat_id, photo_url, caption="", markup=None):
     p = {"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "HTML"}
     if markup:
@@ -32,17 +43,37 @@ def send_photo(chat_id, photo_url, caption="", markup=None):
     return call("sendPhoto", **p)
 
 
-def send_document(chat_id, filename, content, caption=""):
+def send_dice(chat_id, emoji="🎲"):
+    return call("sendDice", chat_id=chat_id, emoji=emoji)
+
+
+def _upload(method, field, filename, content, data, markup=None):
+    data = {k: v for k, v in data.items() if v is not None}
+    data["parse_mode"] = "HTML"
+    if markup:
+        data["reply_markup"] = json.dumps(markup)
     try:
         r = requests.post(
-            f"{_base()}/sendDocument",
-            data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
-            files={"document": (filename, content)},
-            timeout=55,
+            f"{_base()}/{method}", data=data, files={field: (filename, content)}, timeout=120
         )
         return r.json()
     except Exception as e:
         return {"ok": False, "description": str(e)}
+
+
+def send_document(chat_id, filename, content, caption="", markup=None):
+    return _upload("sendDocument", "document", filename, content,
+                   {"chat_id": chat_id, "caption": caption}, markup)
+
+
+def send_audio(chat_id, filename, content, caption="", title=None, performer=None, markup=None):
+    return _upload("sendAudio", "audio", filename, content,
+                   {"chat_id": chat_id, "caption": caption, "title": title, "performer": performer}, markup)
+
+
+def send_video(chat_id, filename, content, caption="", markup=None):
+    return _upload("sendVideo", "video", filename, content,
+                   {"chat_id": chat_id, "caption": caption, "supports_streaming": "true"}, markup)
 
 
 def delete(chat_id, message_id):
