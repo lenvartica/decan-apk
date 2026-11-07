@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/*.py": {
+      "maxDuration": 60,
+      "includeFiles": "bot/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/api/webhook" }
+  ]
+}
